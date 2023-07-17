@@ -129,6 +129,11 @@ void SimpleParallelAnalyzer::WorkerThread()
 			continue;
 		}
 
+		// skip glitches that are only 1 sample long
+		if (uiNearestEdge - sample <= 1) {
+			continue;
+		}
+
 		//add frame
 		//note that with uiNearestEdge = UINT64_MAX the last value is added as TabularText
 		//but not displayed as BubbleText
