@@ -24,6 +24,7 @@ protected: //functions
 protected:  //vars
 	SimpleParallelAnalyzerSettings* mSettings;
 	SimpleParallelAnalyzer* mAnalyzer;
+	U32 mActiveChannelCount;
 };
 
 #endif //SIMPLEPARALLEL_ANALYZER_RESULTS

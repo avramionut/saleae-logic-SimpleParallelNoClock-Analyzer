@@ -2,14 +2,16 @@
 #include "SimpleParallelNoClockAnalyzerSettings.h"
 #include <AnalyzerChannelData.h>
 
+#include <algorithm>
+
 SimpleParallelAnalyzer::SimpleParallelAnalyzer()
 :	Analyzer2(),  
 	mSettings( new SimpleParallelAnalyzerSettings() ),
 	mSimulationInitilized( false )
 {
 	SetAnalyzerSettings( mSettings.get() );
-    // Add this line to your Analyzer constructor!
-    UseFrameV2();
+	// Add this line to your Analyzer constructor!
+	UseFrameV2();
 }
 
 SimpleParallelAnalyzer::~SimpleParallelAnalyzer()
@@ -54,6 +56,9 @@ void SimpleParallelAnalyzer::WorkerThread()
 	}
 
 	U32 num_data_lines = (U32)mData.size();
+	if (num_data_lines == 0) {
+		return;
+	}
 
 	//start at current position (leftmost, regardless of edge)
 	U64 uiNearestEdge = mData[0]->GetSampleNumber();
@@ -83,11 +88,9 @@ void SimpleParallelAnalyzer::WorkerThread()
 				result |= mDataMasks[i];
 			}
 			mResults->AddMarker( sample, AnalyzerResults::Dot, mDataChannels[i] );
-		}	
+		}
 
-		//Find the next nearest edge of all channels.
-		//If there are no more edges left uiNearestEdge stays at UINT64_MAX.
-		uiNearestEdge = UINT64_MAX;
+		// update mDataNextEdge if necessary
 		for (U32 i = 0; i<num_data_lines; i++)
 		{
 			//mDataNextEdge needs to be updated only if we advanced with the
@@ -103,10 +106,32 @@ void SimpleParallelAnalyzer::WorkerThread()
 					mDataNextEdge[i] = UINT64_MAX; //flag no more edges left
 				}
 			}
+		}
 
-			if (mDataNextEdge[i] < uiNearestEdge) {
-				uiNearestEdge = mDataNextEdge[i];
+		//Find the next nearest edge of all channels.
+		//If there are no more edges left nextEdge is UINT64_MAX.
+		U64 nextEdge = *std::min_element(mDataNextEdge.begin(), mDataNextEdge.end());
+
+		if (nextEdge != UINT64_MAX)	{
+			uiNearestEdge = nextEdge;
+		}
+		else {
+			// step forward gradually until there are edges available (i.e. wait for the live capture to progress)
+			const U32 step = GetSampleRate() / 1000;
+			for (U32 i = 0; i < num_data_lines; i++) {
+				if (mData[i]->DoMoreTransitionsExistInCurrentData()) {
+					mDataNextEdge[i] = mData[i]->GetSampleOfNextEdge();
+				}
+				else if (!mData[i]->WouldAdvancingCauseTransition(step)) {
+					mData[i]->Advance(step);
+				}
 			}
+			continue;
+		}
+
+		// skip glitches that are only 1 sample long
+		if (uiNearestEdge - sample <= 1) {
+			continue;
 		}
 
 		//add frame
@@ -119,15 +144,20 @@ void SimpleParallelAnalyzer::WorkerThread()
 		frame.mEndingSampleInclusive = uiNearestEdge;
 		mResults->AddFrame( frame );
 
-        // New FrameV2 code.
-        FrameV2 frame_v2;
-        // you can add any number of key value pairs. Each will get it's own column in the data table.
-        frame_v2.AddInteger( "data", frame.mData1 );
-        // This actually saves your new FrameV2. In this example, we just copy the same start and end sample number from Frame V1 above.
-        // The second parameter is the frame "type". Any string is allowed. 
-        mResults->AddFrameV2( frame_v2, "data", frame.mStartingSampleInclusive, frame.mEndingSampleInclusive );
+		// New FrameV2 code.
+		FrameV2 frame_v2;
+		// you can add any number of key value pairs. Each will get it's own column in the data table.
+		if (num_data_lines > 8) {
+			frame_v2.AddInteger( "data", result );
+		}
+		else {
+			frame_v2.AddByte( "data", static_cast<U8>(result) );
+		}
+		// This actually saves your new FrameV2. In this example, we just copy the same start and end sample number from Frame V1 above.
+		// The second parameter is the frame "type". Any string is allowed. 
+		mResults->AddFrameV2( frame_v2, "data", frame.mStartingSampleInclusive, frame.mEndingSampleInclusive );
 
-        mResults->CommitResults();
+		mResults->CommitResults();
 
 		ReportProgress( frame.mEndingSampleInclusive );
 	}

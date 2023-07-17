@@ -2,6 +2,7 @@
 #include <AnalyzerHelpers.h>
 #include "SimpleParallelNoClockAnalyzer.h"
 #include "SimpleParallelNoClockAnalyzerSettings.h"
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <stdio.h>
@@ -11,6 +12,8 @@ SimpleParallelAnalyzerResults::SimpleParallelAnalyzerResults( SimpleParallelAnal
 	mSettings( settings ),
 	mAnalyzer( analyzer )
 {
+	const auto& channels = mSettings->mDataChannels;
+	mActiveChannelCount = static_cast<U32>(std::count_if(channels.begin(), channels.end(), [](const Channel& channel){ return channel != UNDEFINED_CHANNEL; }));
 }
 
 SimpleParallelAnalyzerResults::~SimpleParallelAnalyzerResults()
@@ -23,7 +26,7 @@ void SimpleParallelAnalyzerResults::GenerateBubbleText( U64 frame_index, Channel
 	Frame frame = GetFrame( frame_index );
 
 	char number_str[128];
-	AnalyzerHelpers::GetNumberString(frame.mData1, display_base, 8, number_str, 128);
+	AnalyzerHelpers::GetNumberString(frame.mData1, display_base, mActiveChannelCount, number_str, 128);
 	AddResultString( number_str );
 }
 
@@ -46,7 +49,7 @@ void SimpleParallelAnalyzerResults::GenerateExportFile( const char* file, Displa
 		AnalyzerHelpers::GetTimeString( frame.mStartingSampleInclusive, trigger_sample, sample_rate, time_str, 128 );
 
 		char number_str[128];
-		AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 16, number_str, 128 );
+		AnalyzerHelpers::GetNumberString( frame.mData1, display_base, mActiveChannelCount, number_str, 128 );
 
 		ss << time_str << "," << number_str << std::endl;
 
@@ -70,7 +73,7 @@ void SimpleParallelAnalyzerResults::GenerateFrameTabularText( U64 frame_index, D
 	Frame frame = GetFrame( frame_index );
 
 	char number_str[128];
-	AnalyzerHelpers::GetNumberString( frame.mData1, display_base, 16, number_str, 128 );
+	AnalyzerHelpers::GetNumberString( frame.mData1, display_base, mActiveChannelCount, number_str, 128 );
 	AddTabularText( number_str );
 }
 
