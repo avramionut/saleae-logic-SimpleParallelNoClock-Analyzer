@@ -2,6 +2,8 @@
 #include "SimpleParallelNoClockAnalyzerSettings.h"
 #include <AnalyzerChannelData.h>
 
+#include <algorithm>
+
 SimpleParallelAnalyzer::SimpleParallelAnalyzer()
 :	Analyzer2(),  
 	mSettings( new SimpleParallelAnalyzerSettings() ),
@@ -54,6 +56,9 @@ void SimpleParallelAnalyzer::WorkerThread()
 	}
 
 	U32 num_data_lines = (U32)mData.size();
+	if (num_data_lines == 0) {
+		return;
+	}
 
 	//start at current position (leftmost, regardless of edge)
 	U64 uiNearestEdge = mData[0]->GetSampleNumber();
@@ -83,11 +88,9 @@ void SimpleParallelAnalyzer::WorkerThread()
 				result |= mDataMasks[i];
 			}
 			mResults->AddMarker( sample, AnalyzerResults::Dot, mDataChannels[i] );
-		}	
+		}
 
-		//Find the next nearest edge of all channels.
-		//If there are no more edges left uiNearestEdge stays at UINT64_MAX.
-		uiNearestEdge = UINT64_MAX;
+		// update mDataNextEdge if necessary
 		for (U32 i = 0; i<num_data_lines; i++)
 		{
 			//mDataNextEdge needs to be updated only if we advanced with the
@@ -103,10 +106,27 @@ void SimpleParallelAnalyzer::WorkerThread()
 					mDataNextEdge[i] = UINT64_MAX; //flag no more edges left
 				}
 			}
+		}
 
-			if (mDataNextEdge[i] < uiNearestEdge) {
-				uiNearestEdge = mDataNextEdge[i];
+		//Find the next nearest edge of all channels.
+		//If there are no more edges left nextEdge is UINT64_MAX.
+		U64 nextEdge = *std::min_element(mDataNextEdge.begin(), mDataNextEdge.end());
+
+		if (nextEdge != UINT64_MAX)	{
+			uiNearestEdge = nextEdge;
+		}
+		else {
+			// step forward gradually until there are edges available (i.e. wait for the live capture to progress)
+			const U32 step = GetSampleRate() / 1000;
+			for (U32 i = 0; i < num_data_lines; i++) {
+				if (mData[i]->DoMoreTransitionsExistInCurrentData()) {
+					mDataNextEdge[i] = mData[i]->GetSampleOfNextEdge();
+				}
+				else if (!mData[i]->WouldAdvancingCauseTransition(step)) {
+					mData[i]->Advance(step);
+				}
 			}
+			continue;
 		}
 
 		//add frame
