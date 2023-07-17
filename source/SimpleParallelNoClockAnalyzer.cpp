@@ -8,8 +8,8 @@ SimpleParallelAnalyzer::SimpleParallelAnalyzer()
 	mSimulationInitilized( false )
 {
 	SetAnalyzerSettings( mSettings.get() );
-    // Add this line to your Analyzer constructor!
-    UseFrameV2();
+	// Add this line to your Analyzer constructor!
+	UseFrameV2();
 }
 
 SimpleParallelAnalyzer::~SimpleParallelAnalyzer()
@@ -119,15 +119,15 @@ void SimpleParallelAnalyzer::WorkerThread()
 		frame.mEndingSampleInclusive = uiNearestEdge;
 		mResults->AddFrame( frame );
 
-        // New FrameV2 code.
-        FrameV2 frame_v2;
-        // you can add any number of key value pairs. Each will get it's own column in the data table.
-        frame_v2.AddInteger( "data", frame.mData1 );
-        // This actually saves your new FrameV2. In this example, we just copy the same start and end sample number from Frame V1 above.
-        // The second parameter is the frame "type". Any string is allowed. 
-        mResults->AddFrameV2( frame_v2, "data", frame.mStartingSampleInclusive, frame.mEndingSampleInclusive );
+		// New FrameV2 code.
+		FrameV2 frame_v2;
+		// you can add any number of key value pairs. Each will get it's own column in the data table.
+		frame_v2.AddInteger( "data", frame.mData1 );
+		// This actually saves your new FrameV2. In this example, we just copy the same start and end sample number from Frame V1 above.
+		// The second parameter is the frame "type". Any string is allowed. 
+		mResults->AddFrameV2( frame_v2, "data", frame.mStartingSampleInclusive, frame.mEndingSampleInclusive );
 
-        mResults->CommitResults();
+		mResults->CommitResults();
 
 		ReportProgress( frame.mEndingSampleInclusive );
 	}
