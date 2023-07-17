@@ -142,7 +142,12 @@ void SimpleParallelAnalyzer::WorkerThread()
 		// New FrameV2 code.
 		FrameV2 frame_v2;
 		// you can add any number of key value pairs. Each will get it's own column in the data table.
-		frame_v2.AddInteger( "data", frame.mData1 );
+		if (num_data_lines > 8) {
+			frame_v2.AddInteger( "data", result );
+		}
+		else {
+			frame_v2.AddByte( "data", static_cast<U8>(result) );
+		}
 		// This actually saves your new FrameV2. In this example, we just copy the same start and end sample number from Frame V1 above.
 		// The second parameter is the frame "type". Any string is allowed. 
 		mResults->AddFrameV2( frame_v2, "data", frame.mStartingSampleInclusive, frame.mEndingSampleInclusive );
